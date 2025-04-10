@@ -1,11 +1,15 @@
-import { Agent, Connection, ConnectionContext, WSMessage } from "agents";
+import { Connection, ConnectionContext, WSMessage } from "agents";
 
 export interface TrafficStrategyAgentEnv {
-	AI: Ai;
+	OPENAI_API_KEY: string;
 }
 
-export class TrafficStrategyAgent extends Agent<{}> {
+export class TrafficStrategyAgent {
+	constructor(private env: TrafficStrategyAgentEnv) {}
 	async invoke(input: string) {
+		if (!this.env.OPENAI_API_KEY) {
+			throw new Error("OpenAI API key não configurada no ambiente");
+		}
 		const prompt = `
 Você é um especialista em tráfego pago. Gere uma estratégia completa de mídia paga para o seguinte objetivo:
 
@@ -24,12 +28,36 @@ Formato da resposta:
 2. Diagrama Mermaid (bloco separado)
 `;
 
-		const result = await this.env.AI.run("@cf/meta/llama-3-8b-instruct", { prompt });
+		try {
+			const response = await fetch("https://api.openai.com/v1/chat/completions", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${this.env.OPENAI_API_KEY}`,
+				},
+				body: JSON.stringify({
+					model: "gpt-3.5-turbo",
+					messages: [{ role: "user", content: prompt }],
+					temperature: 0.7,
+				}),
+			});
 
-		return {
-			role: "assistant",
-			content: result.response
-		};
+			if (!response.ok) {
+				throw new Error(`API error: ${response.status} ${response.statusText}`);
+			}
+
+			const data: any = await response.json();
+
+			if (!data?.choices?.[0]?.message?.content) {
+				console.error("Resposta inesperada da OpenAI:", data);
+				throw new Error("Resposta da API em formato inesperado");
+			}
+
+			return data.choices[0].message.content;
+		} catch (error) {
+			console.error("Erro ao chamar OpenAI:", error);
+			return "Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.";
+		}
 	}
 
 	async onConnect(connection: Connection, ctx: ConnectionContext) {

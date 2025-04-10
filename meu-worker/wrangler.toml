@@ -1,0 +1,10 @@
+name = "traffic-strategy-agent"
+main = "src/server.ts"
+compatibility_date = "2023-07-01"
+
+[ai]
+binding = "AI"
+
+[[durable_objects]]
+name = "MY_DURABLE_OBJECT"
+class_name = "MyDurableObject"

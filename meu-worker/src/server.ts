@@ -1,29 +1,28 @@
 import { TrafficStrategyAgent, TrafficStrategyAgentEnv } from "./agents/traffic-strategy-agent";
 
-interface Env extends TrafficStrategyAgentEnv {
-	MY_DURABLE_OBJECT: DurableObjectNamespace;
-}
+interface Env extends TrafficStrategyAgentEnv {}
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const agent = new TrafficStrategyAgent(env);
+		const url = new URL(request.url);
 
-		if (request.headers.get("Upgrade") === "websocket") {
-			const [client, server] = Object.values(new WebSocketPair());
-			await agent.handleWebSocket(server);
-
-			return new Response(null, {
-				status: 101,
-				webSocket: client,
-			});
+		if (request.method === "POST") {
+			try {
+				const input = await request.text();
+				const result = await agent.invoke(input);
+				return new Response(result, {
+					headers: { 'Content-Type': 'text/plain' }
+				});
+			} catch (error: any) {
+				return new Response(`Error: ${error.message}`, {
+					status: 500,
+					headers: { 'Content-Type': 'text/plain' }
+				});
+			}
 		}
-
-		// Lidar com requisição HTTP normal
-		const input = await request.text();
-		const result = await agent.invoke(input);
-
-		return new Response(JSON.stringify(result), {
-			headers: { "Content-Type": "application/json" }
+		return new Response("Use POST method with your input in the body", {
+			headers: { 'Content-Type': 'text/plain' }
 		});
 	}
 };
